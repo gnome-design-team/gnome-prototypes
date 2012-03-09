@@ -19,6 +19,8 @@
 """
 
 from gi.repository import Gtk, GObject, Gio, Gdk
+from gi.repository.GdkPixbuf import Pixbuf
+
 from widgets import NewWorldClockWidget, DigitalClock
 from datetime import datetime, timedelta
 from pytz import timezone
@@ -68,12 +70,28 @@ class World (Clock):
     def __init__ (self):
         Clock.__init__ (self, "World", True)
         self.addButton = None
-        self.grid = Gtk.Grid()
-        self.grid.set_border_width(15)
-        self.grid.set_column_spacing (15)
-        self.add(self.grid)
+        #self.grid = Gtk.Grid()
+        #self.grid.set_border_width(15)
+        #self.grid.set_column_spacing (15)
+        #self.add(self.grid)
+        
+        self.liststore = liststore = Gtk.ListStore(Pixbuf, str)
+        iconview = Gtk.IconView.new()
+        
+        iconview.set_model(liststore)
+        
+        iconview.set_spacing(3)
+        iconview.set_pixbuf_column(0)
+        iconview.set_markup_column(1)
+        iconview.set_item_width(160)
+        
+        scrolledwindow = Gtk.ScrolledWindow()
+        scrolledwindow.add(iconview)
+        self.add(scrolledwindow)
+        
         self.clocks = []
         self.load_clocks()
+        self.show_all()
         
     def set_addButton(self, btn):
         self.addButton = btn
@@ -87,25 +105,13 @@ class World (Clock):
         pass
     
     def add_clock(self, location):
-        """
         print "====="
-        print location.get_property("country")
-        print location.get_property("dist")
-        print location.get_property("latitude")
-        print location.get_property("longitude")
-        tz = timezone(location.get_property("zone"))
-        dt = datetime.now(tz)
-        tz_timedelta = dt.utcoffset()
-        offset = abs(tz_timedelta).seconds
-        if (tz_timedelta.days < 0):
-            # Find if offset is negative
-            offset = 0 - offset
-        print offset
-        print   os.environ["TZ"]
         print "====="
-        """
         d = DigitalClock(location)
-        self.grid.add(d)
+        self.clocks.append(d)
+        #self.grid.add(d)
+        view_iter = self.liststore.append([d.get_pixbuf(), "<b>"+d.location.get_city_name()+"</b>"])
+        d.set_iter(self.liststore, view_iter)
         self.show_all()
         
     def open_new_dialog(self):
@@ -139,6 +145,7 @@ class World (Clock):
 class Alarm (Clock):
     def __init__ (self):
         Clock.__init__ (self, "Alarm", True)
+        self.button.set_sensitive (False)
 
 class Stopwatch (Clock):
 
@@ -257,4 +264,5 @@ class Stopwatch (Clock):
 class Timer (Clock):
     def __init__ (self):
         Clock.__init__ (self, "Timer")
+        self.button.set_sensitive (False)
 

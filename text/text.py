@@ -54,7 +54,7 @@ class View(Gtk.Box):
 class Toolbar(Gtk.Toolbar):
     def __init__(self):
         Gtk.Toolbar.__init__(self)
-        self.get_style_context().add_class("primary-toolbar");
+        #self.get_style_context().add_class("primary-toolbar");
         self.set_icon_size(Gtk.IconSize.LARGE_TOOLBAR)
         
         self._rightGroup = Gtk.ToolItem()

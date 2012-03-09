@@ -98,16 +98,30 @@ class NewWorldClockWidget (Gtk.Box):
     def get_selection (self):
         return self.location
 
-class DigitalClock (Gtk.Box):
+class DigitalClock ():
     def __init__(self, location):
-        Gtk.Box.__init__(self, orientation=Gtk.Orientation.VERTICAL)
-        self.set_spacing(6)
         self.location = location
+        self.view_iter = None
         self.drawing = DigitalClockDawing(location)
-        self.label = Gtk.Label()
-        self.label.set_markup("<b>%s</b>"%self.location.get_city_name())
-        self.pack_start(self.drawing, False, False, 0)
-        self.pack_start(self.label, False, False, 0)
+        self.list_store = None
+        GObject.timeout_add(1000, self.update)
+        print "DIGI"
+    
+    def update(self):
+        self.drawing.render()
+        if self.view_iter and self.list_store:
+            print "---"
+            self.list_store.set_value(self.view_iter, 0, self.get_pixbuf())
+        return True
+    
+    def set_iter (self, list_store, view_iter):
+        print "=====>", view_iter
+        self.view_iter = view_iter
+        self.list_store = list_store
+        
+    def get_pixbuf(self):
+        return self.drawing.pixbuf
+
 
 class DigitalClockDawing (Gtk.DrawingArea):
     width = 160
@@ -123,10 +137,10 @@ class DigitalClockDawing (Gtk.DrawingArea):
         self.set_size_request(160,160)
         self.pango_context = None
         self.ctx = None
+        self.pixbuf = None
         self.surface = None
-        
-        self.connect('draw', self.draw)
-        GObject.timeout_add(1000, self.update)
+        self.text = None
+        self.render()
         self.show_all()
         
     def is_sun_changed(self, local_time):
@@ -144,58 +158,62 @@ class DigitalClockDawing (Gtk.DrawingArea):
             return "data/cities/day.png"
         else:
             return "data/cities/night.png"
-            
-    def update(self):
-        self.queue_draw ()
-        return True
 
-    def draw(self, widget, ctx):
-    
+    def render(self):
+        #FIXME
         t = time.time() + time.timezone + self.offset
         t = time.localtime(t)
-        
-        if self.is_sun_changed(t):
-            self.img = self.get_image(t)
-            self.surface = cairo.ImageSurface.create_from_png(self.img)
-    
-        ctx.scale(1.0, 1.0)
-        ctx.set_source_surface(self.surface, 0, 0)
-        ctx.paint()
-        
-        width = 136
-        height = 72
-        radius = 10
-        degrees = 0.017453293
-        
-        x = (self.width - width)/2
-        y = (self.height - height)/2
-        
-        if not self.isDay:
-            ctx.set_source_rgba(0.0, 0.0, 0.0, 0.7)
-        else:
-            ctx.set_source_rgba(1.0, 1.0, 1.0, 0.7)
-        ctx.arc(x + width - radius, y + radius, radius, -90 * degrees, 0 * degrees);
-        ctx.arc(x + width - radius, y + height - radius, radius, 0 * degrees, 90 * degrees);
-        ctx.arc(x + radius, y + height - radius, radius, 90 * degrees, 180 * degrees);
-        ctx.arc(x + radius, y + radius, radius, 180 * degrees, 270 * degrees);
-        ctx.close_path()
-        ctx.fill()
 
-        
         text = time.strftime("%I:%M %p", t)
-        if text.startswith("0"):
-            text = text[1:]
-        
-        self.pango_layout = self.create_pango_layout(text)
-        self.pango_layout.set_markup ("<span size='xx-large'><b>%s</b></span>"%text, -1)
+        if self.text != text:
+            self.text = text
+            img = self.get_image(t)
+            self.surface = cairo.ImageSurface.create_from_png(img)
+            ctx = cairo.Context(self.surface)
+            ctx.scale(1.0, 1.0)
+            ctx.set_source_surface(self.surface, 0, 0)
+            ctx.paint()
 
-        if not self.isDay:
-            ctx.set_source_rgb(1.0, 1.0, 1.0)
-        else:
-            ctx.set_source_rgb(0.0, 0.0, 0.0)
-        text_width, text_height = self.pango_layout.get_pixel_size()
-        ctx.move_to(x + (width - text_width)/2, y + (height - text_height)/2)
-        PangoCairo.show_layout(ctx, self.pango_layout)
+            width = 136
+            height = 72
+            radius = 10
+            degrees = 0.017453293
+
+            x = (self.width - width)/2
+            y = (self.height - height)/2
+
+            b = self.is_sun_changed(t)
+
+            if not self.isDay:
+                ctx.set_source_rgba(0.0, 0.0, 0.0, 0.7)
+            else:
+                ctx.set_source_rgba(1.0, 1.0, 1.0, 0.7)
+
+            ctx.arc(x + width - radius, y + radius, radius, -90 * degrees, 0 * degrees);
+            ctx.arc(x + width - radius, y + height - radius, radius, 0 * degrees, 90 * degrees);
+            ctx.arc(x + radius, y + height - radius, radius, 90 * degrees, 180 * degrees);
+            ctx.arc(x + radius, y + radius, radius, 180 * degrees, 270 * degrees);
+            ctx.close_path()
+            ctx.fill()
+
+            text = time.strftime("%I:%M %p", t)
+            if text.startswith("0"):
+                text = text[1:]
+            
+            self.pango_layout = self.create_pango_layout(text)
+            self.pango_layout.set_markup ("<span size='xx-large'><b>%s</b></span>"%text, -1)
+
+            if not self.isDay:
+                ctx.set_source_rgb(1.0, 1.0, 1.0)
+            else:
+                ctx.set_source_rgb(0.0, 0.0, 0.0)
+            text_width, text_height = self.pango_layout.get_pixel_size()
+            ctx.move_to(x + (width - text_width)/2, y + (height - text_height)/2)
+            PangoCairo.show_layout(ctx, self.pango_layout)
+
+            pixbuf = Gdk.pixbuf_get_from_surface(self.surface, 0, 0, self.width, self.height)
+            self.pixbuf = pixbuf
+        return self.pixbuf
 
 if __name__ == "__main__":
     cw = ClockWidget("Europe", "Berlin", "data/cities/berlin.jpg")
